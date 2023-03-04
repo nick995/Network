@@ -22,13 +22,12 @@ def ctrl_c_pressed(signal, frame):
 def handle_client(client_socket, client_addr):
    
     bin = False
-    endFlag = False
     checkData = ""
     header = ''
-    extraHTML = ''
-    headerList = ''
+    # extraHTML = ''
+    # headerList = ''
     
-    while(endFlag == False) :
+    while(1) :
         # keep receiving while user enter twice
         readData = client_socket.recv(2048).decode()
 
@@ -142,9 +141,12 @@ def handle_client(client_socket, client_addr):
         temp = URL.find('/')
         PATH = URL[temp:]  # split the extra html
         URL = URL[:temp]        # only html
+    
+    
+    
             
     format['HOST'] = URL
-
+    
     format['HTTP_VERSION'] = URL_Version + '\r\n'
 
     if(bin == False):
@@ -152,7 +154,7 @@ def handle_client(client_socket, client_addr):
         sendServer = format['METHOD']+ " "  + PATH + " "  + format['HTTP_VERSION'] + "Host: " + format['HOST']+ "\r\n" + "Connection: close" + header + "\r\n\r\n"
         
         
-        print("===========After adding======")
+        print("==========After adding==========")
         print(sendServer)
         print("==============================")
 
