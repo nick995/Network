@@ -14,6 +14,28 @@ Host_List = ['User-Agent', 'Accept', 'Referer', 'Header']
 format = {'METHOD' : '', 'HOST': '','HTTP_VERSION': '', 'CONNECTION': '',}
 
 userList = []
+cacheList = {}
+
+def cache_request(client_socket, PATH):
+    s_cache_request = PATH.split("/")
+    cache_request = s_cache_request[3]
+    
+    if cache_request == "flush":
+        cacheList.clear()
+    elif cache_request == "enable":
+        print
+    elif cache_request == "disable":
+        print
+    
+    clientSocket.send("200 OK\r\n")
+        
+    
+
+
+def cache_blocklist(client_socet, PATH):
+    s_cache_request = PATH.split("/")
+    cache_blocklist = s_cache_request[3]
+
 
 # Signal handler for pressing ctrl-c
 def ctrl_c_pressed(signal, frame):
@@ -142,8 +164,14 @@ def handle_client(client_socket, client_addr):
         PATH = URL[temp:]  # split the extra html
         URL = URL[:temp]        # only html
     
-    
-    
+    if "proxy/cache" in PATH:
+        cache_request(client_socket, PATH)
+        bin == True
+
+    if "proxy/blocklist" in PATH:
+        cache_blocklist(client_socket, PATH)
+        bin == True
+
             
     format['HOST'] = URL
     
