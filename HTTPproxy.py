@@ -15,24 +15,21 @@ format = {'METHOD' : '', 'HOST': '','HTTP_VERSION': '', 'CONNECTION': '',}
 
 userList = []
 cacheList = {}
+proxy_cache = False
+proxy_block = False
 
-def cache_request(client_socket, PATH):
-    s_cache_request = PATH.split("/")
-    cache_request = s_cache_request[3]
-    
-    if cache_request == "flush":
+def proxy_cache_order(order):
+
+    if order == "flush":
         cacheList.clear()
-    elif cache_request == "enable":
-        print
-    elif cache_request == "disable":
-        print
-    
-    clientSocket.send("200 OK\r\n")
-        
-    
+    elif order == "enable":
+        proxy_cache == True
+    elif order == "disable":
+        proxy_cache == False
+    message = "200 OK"
+    return message.encode()
 
-
-def cache_blocklist(client_socet, PATH):
+def proxy_block_order(client_socet, PATH):
     s_cache_request = PATH.split("/")
     cache_blocklist = s_cache_request[3]
 
@@ -42,7 +39,6 @@ def ctrl_c_pressed(signal, frame):
     sys.exit(0)
 
 def handle_client(client_socket, client_addr):
-   
     bin = False
     checkData = ""
     header = ''
@@ -164,20 +160,44 @@ def handle_client(client_socket, client_addr):
         PATH = URL[temp:]  # split the extra html
         URL = URL[:temp]        # only html
     
-    if "proxy/cache" in PATH:
-        cache_request(client_socket, PATH)
-        bin == True
+    if "proxy/" in PATH:
+        path_split = PATH.split("/")
+        if path_split[2] == "cache":
+            client_socket.send(proxy_cache_order(path_split[3]))
+        elif path_split[2] == "blocklist":
+            client_socket.send(proxy_block_order(path_split[3]))
+        client_socket.close()
+        return
 
-    if "proxy/blocklist" in PATH:
-        cache_blocklist(client_socket, PATH)
-        bin == True
+    # if "proxy/cache" in PATH:
+        
+    #     client_socket.send(cache_request(PATH))
+    #     client_socket.close()
+    #     bin = True
+
+    #     # s_cache_request = PATH.split("/")
+    #     # cache_request = s_cache_request[3]
+    #     # if cache_request == "flush":
+    #     #     cacheList.clear()
+    #     # elif cache_request == "enable":
+    #     #     proxy_cache == True
+    #     # elif cache_request == "disable":
+    #     #     proxy_cache == False
+    #     # message = "200 OK"
+    #     # client_socket.send(message.encode())
+    #     # bin == True
+
+    # if "proxy/blocklist" in PATH:
+    #     cache_blocklist(client_socket, PATH)
+    #     bin = True
 
             
     format['HOST'] = URL
     
     format['HTTP_VERSION'] = URL_Version + '\r\n'
-
-    if(bin == False):
+    if(bin == True):
+        return
+    else:
         print("==========Send to server process is on =========")
         sendServer = format['METHOD']+ " "  + PATH + " "  + format['HTTP_VERSION'] + "Host: " + format['HOST']+ "\r\n" + "Connection: close" + header + "\r\n\r\n"
         
