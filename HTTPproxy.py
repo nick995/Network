@@ -1,3 +1,4 @@
+
 import signal
 import sys
 import threading
@@ -19,17 +20,18 @@ proxy_cache = False
 proxy_block = False
 
 def proxy_cache_order(order):
-
+    global proxy_cache 
     if order == "flush":
         cacheList.clear()
     elif order == "enable":
-        proxy_cache == True
+        proxy_cache = True
     elif order == "disable":
-        proxy_cache == False
+        proxy_cache = False
     message = "200 OK"
     return message.encode()
 
 def proxy_block_order(client_socet, PATH):
+    global proxy_block
     s_cache_request = PATH.split("/")
     cache_blocklist = s_cache_request[3]
 
@@ -42,6 +44,7 @@ def handle_client(client_socket, client_addr):
     bin = False
     checkData = ""
     header = ''
+    global proxy_cache
     # extraHTML = ''
     # headerList = ''
     
@@ -165,7 +168,7 @@ def handle_client(client_socket, client_addr):
         if path_split[2] == "cache":
             client_socket.send(proxy_cache_order(path_split[3]))
         elif path_split[2] == "blocklist":
-            client_socket.send(proxy_block_order(path_split[3]))
+            client_socket.send(proxy_block_order(PATH))
         client_socket.close()
         return
 
@@ -190,8 +193,7 @@ def handle_client(client_socket, client_addr):
     # if "proxy/blocklist" in PATH:
     #     cache_blocklist(client_socket, PATH)
     #     bin = True
-
-            
+    
     format['HOST'] = URL
     
     format['HTTP_VERSION'] = URL_Version + '\r\n'
@@ -199,9 +201,24 @@ def handle_client(client_socket, client_addr):
         return
     else:
         print("==========Send to server process is on =========")
-        sendServer = format['METHOD']+ " "  + PATH + " "  + format['HTTP_VERSION'] + "Host: " + format['HOST']+ "\r\n" + "Connection: close" + header + "\r\n\r\n"
         
+        # if URL_Parse.netloc in cacheList and cacheList[URL_Parse.netloc] == True:
+        #     sendServer = format['METHOD']+ " "  + PATH + " "  + format['HTTP_VERSION'] + "Host: " + format['HOST']+ "\r\n" + "Connection: close" + header + "If-modified-since: " + [time] + "\r\n" + "\r\n\r\n"
+        # else:
+        #     sendServer = format['METHOD']+ " "  + PATH + " "  + format['HTTP_VERSION'] + "Host: " + format['HOST']+ "\r\n" + "Connection: close" + header + "\r\n\r\n"
         
+        # Check if cache is enable or disable
+        if proxy_cache == True:
+            # If it's cached.
+            if URL_Parse.netloc in cacheList:
+                tempDate = cacheList[URL_Parse.netloc].decode().split("\r\n")
+                modifier = tempDate[2].replace("Date: ", "")
+                sendServer = format['METHOD']+ " "  + PATH + " "  + format['HTTP_VERSION'] + "Host: " + format['HOST']+ "\r\n"+ "If-Modified-Since: "+ modifier+ "\r\n" + "Connection: close" + header + "\r\n\r\n"
+            else:
+                sendServer = format['METHOD']+ " "  + PATH + " "  + format['HTTP_VERSION'] + "Host: " + format['HOST']+ "\r\n" + "Connection: close" + header + "\r\n\r\n"
+        else:
+            sendServer = format['METHOD']+ " "  + PATH + " "  + format['HTTP_VERSION'] + "Host: " + format['HOST']+ "\r\n" + "Connection: close" + header + "\r\n\r\n"
+            
         print("==========After adding==========")
         print(sendServer)
         print("==============================")
@@ -209,22 +226,41 @@ def handle_client(client_socket, client_addr):
         #   create new socket for server
         originServer = socket(AF_INET, SOCK_STREAM)
 
-        protNumber = 80
+        port_number = 80
         #   connect with server, host name should be
         if(URL_Parse.port):
-            protNumber = URL_Parse.port
+            port_number = URL_Parse.port
         
-        originServer.connect((format['HOST'], protNumber))
+        originServer.connect((format['HOST'], port_number))
         #   Send data to server
         originServer.sendall(sendServer.encode())
+        value = b''
+        not_modified = False
         while True:
             temp = originServer.recv(2048)  #receive from originServer
             #   if temp is not valid, break it
             # print(temp)
             if temp == b'':
                 break
-        #   send 
-            client_socket.send(temp)
+            #Send to client 
+            value += temp
+            # print("From the origin : ", repr(temp))
+            if proxy_cache == True:
+                if "304 Not Modified" in temp.decode():
+                    not_modified = True
+                    break
+        if proxy_cache == True:
+            print("proxy cache is true")
+            if not_modified == True:
+                print("not modified is true")
+                client_socket.send(cacheList[URL_Parse.netloc])
+            else:
+                print("not modified is false")
+                cacheList[URL_Parse.netloc] = value
+                client_socket.send(value)
+        else:
+            client_socket.send(value)    
+            
         originServer.close()
         client_socket.close()
     
@@ -276,4 +312,3 @@ while True:
     userList.append(connectionSocket)
     
     threading.Thread(target=handle_client, args=(connectionSocket, addr)).start()
-    
