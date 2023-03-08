@@ -16,6 +16,7 @@ format = {'METHOD' : '', 'HOST': '','HTTP_VERSION': '', 'CONNECTION': '',}
 
 userList = []
 cacheList = {}
+blocklist = {}
 proxy_cache = False
 proxy_block = False
 
@@ -30,11 +31,22 @@ def proxy_cache_order(order):
     message = "200 OK"
     return message.encode()
 
-def proxy_block_order(client_socet, PATH):
+def proxy_block_order(path):
     global proxy_block
-    s_cache_request = PATH.split("/")
-    cache_blocklist = s_cache_request[3]
-
+    path_split = path.split("/")
+    order = path_split[3]
+    if len(path_split) > 4:
+        if order == "add":
+            blocklist[path_split[4]] = True
+        elif order == "remove":
+            del blocklist[path_split[4]]
+    
+    if order == "enable":
+        proxy_block = True
+    elif order == "disable":
+        proxy_block = False
+    elif order == "flush":
+        blocklist.clear()
 
 # Signal handler for pressing ctrl-c
 def ctrl_c_pressed(signal, frame):
@@ -51,7 +63,7 @@ def handle_client(client_socket, client_addr):
     while(1) :
         # keep receiving while user enter twice
         readData = client_socket.recv(2048).decode()
-
+        
         print("Check Error Here: ", repr(readData))
         sys.stdout.flush()
 
@@ -168,7 +180,7 @@ def handle_client(client_socket, client_addr):
         if path_split[2] == "cache":
             client_socket.send(proxy_cache_order(path_split[3]))
         elif path_split[2] == "blocklist":
-            client_socket.send(proxy_block_order(PATH))
+            proxy_block_order(PATH)
         client_socket.close()
         return
 
@@ -197,8 +209,11 @@ def handle_client(client_socket, client_addr):
     format['HOST'] = URL
     
     format['HTTP_VERSION'] = URL_Version + '\r\n'
-    if(bin == True):
-        return
+    if(URL_Parse.netloc in blocklist and proxy_block == True):
+        error = "403 Forbidden"
+        sys.stderr.write(error)
+        client_socket.send(error.encode())
+        client_socket.close()
     else:
         print("==========Send to server process is on =========")
         
