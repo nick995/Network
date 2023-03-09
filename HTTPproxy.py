@@ -14,73 +14,66 @@ Host_List = ['User-Agent', 'Accept', 'Referer', 'Header']
 #   Dictionary for formatting.
 format = {'METHOD' : '', 'HOST': '','HTTP_VERSION': '', 'CONNECTION': '',}
 
-userList = []
-cacheList = {}
-blocklist = []
-proxy_cache = False
-proxy_block = False
+userList = []                       #holding variety users
+cacheList = {}                      #list of the cache
+blocklist = []                      #list of the blocked domain
+proxy_cache = False                 #to check if caching is enable or disable
+proxy_block = False                 #to check if blocking is enable or disable
 
+#   PA-Final part.
+#   getting order about caching and apply 
 def proxy_cache_order(order):
     global proxy_cache 
-    if order == "flush":
+    if order == "flush":            #clear cachelist
         cacheList.clear()
-    elif order == "enable":
+    elif order == "enable":         #enable caching
         proxy_cache = True
-    elif order == "disable":
+    elif order == "disable":        #disable caching
         proxy_cache = False
     message = "200 OK"
     return message.encode()
 
-<<<<<<< HEAD
-def proxy_block_order(client_socet, PATH):
-    global proxy_block
-    s_cache_request = PATH.split("/")
-    cache_blocklist = s_cache_request[3]
-
-=======
+#   PA-Final part.
+#   getting order about the blocking and apply
 def proxy_block_order(path):
     global proxy_block
     path_split = path.split("/")
     order = path_split[3]
-    if len(path_split) > 4:
+    if len(path_split) > 4:                 #if order is add or remove
         if order == "add":
-            blocklist.append(path_split[4])
+            blocklist.append(path_split[4]) #adding the given string to the list
         elif order == "remove":
-            blocklist.remove(path_split[4])
-    
-    if order == "enable":
+            blocklist.remove(path_split[4]) #remove the given string in the list
+    if order == "enable":                   #enable blocklist
         proxy_block = True
-    elif order == "disable":
+    elif order == "disable":                #disable blocklist
         proxy_block = False
-    elif order == "flush":
+    elif order == "flush":                  #clear blocklist
         blocklist.clear()
->>>>>>> 0119c2a4175e2e35b08e68a55155f6d5ff374671
 
 # Signal handler for pressing ctrl-c
 def ctrl_c_pressed(signal, frame):
     sys.exit(0)
 
-def handle_client(client_socket, client_addr):
+#   Implement a HTTP/1.0 proxy with basic object-caching and domain-blocking features.
+#   It serves multiple concurrent request by threading and it only supports the HTTP 
+#   GET method.
+def proxy_work(client_socket, client_addr):
     bin = False
     checkData = ""
     header = ''
     global proxy_cache
-    # extraHTML = ''
-    # headerList = ''
-    
+
+    # keep receiving while user enter twice 
     while(1) :
-        # keep receiving while user enter twice
         readData = client_socket.recv(2048).decode()
         
         print("Check Error Here: ", repr(readData))
         sys.stdout.flush()
-
         checkData += readData
-
-        if checkData[-4:] == "\r\n\r\n":
+        if checkData[-4:] == "\r\n\r\n":             
             break
 
-    #index 0 = format index 1 = header
     tempSplit = checkData.split("\r\n")
 
     tempSplit = tempSplit[:-2]
@@ -89,10 +82,8 @@ def handle_client(client_socket, client_addr):
 
     split_readData = mainForm.split(' ')
 
-    #====================================
-
+    # check 
     for x in tempSplit[1:]:
-        
         if "Connection: " in x:
             continue
         if(len(tempSplit) > 1):
@@ -103,14 +94,8 @@ def handle_client(client_socket, client_addr):
                 client_socket.send(error.encode())        
                 client_socket.close()
                 bin = True
-                break
+                return
         header += "\r\n" +x
-    if(bin):
-        return;    
-    # print(header)
-    
-    # if first is not get = 
-    # if first is get = 400
 
     # check if length is below than 3
     if len(split_readData)<3 or len(split_readData) >3:
@@ -121,37 +106,30 @@ def handle_client(client_socket, client_addr):
         bin = True
         return
         
-    # at least length is longer than 3.
     method = split_readData[0]
-    
     URL = split_readData[1]
-    
     URL_Version = split_readData[2]
     
+    #   check if URL_Version is valid or not. if not, send 400 error
     if(URL_Version != "HTTP/1.0"):
         error = "HTTP/1.0 400 Bad Request"
         sys.stderr.write(error)
         client_socket.send(error.encode())        
         client_socket.close()
-        bin = True
         return
-    
-    
+    #   check if method is valid or not. if not, send 501 error
     if(method != "GET"):
         error = "HTTP/1.0 501 Not Implemented"
         sys.stderr.write(error)
         client_socket.send(error.encode())
         client_socket.close()
-        bin = True
         return
-    # adding header 
-
-    #check if there's header or not.
 
     format['METHOD'] = method
 
     URL_Parse = urlparse(split_readData[1])
-    
+    #   to check if domain blocking is enable and
+    #   check if host is blocked 
     if(proxy_block == True):
         for block in blocklist:
             if block in URL_Parse.netloc:
@@ -159,26 +137,20 @@ def handle_client(client_socket, client_addr):
                 sys.stderr.write(error)
                 client_socket.send(error.encode())
                 client_socket.close()
-    
+    #   check scheme is valid or not
     if(not URL_Parse.scheme):
-        print("URL scheme checking ", repr(URL_Parse.scheme))
-        sys.stdout.flush()
-        
         error = "HTTP/1.0 400 Bad Request"
         sys.stderr.write(error)
         client_socket.send(error.encode())
         client_socket.close()
-        bin = True
         return
-    
+    #   check path is valid or not
     if(not URL_Parse.path):
         error = "HTTP/1.0 400 Bad Request"
         sys.stderr.write(error)
         client_socket.send(error.encode())
         client_socket.close()
-        bin = True
         return
-        
     
     if(URL_Parse.hostname == 'localhost'):
         URL = 'localhost'
@@ -186,128 +158,72 @@ def handle_client(client_socket, client_addr):
     else:
         URL = URL.replace("http://", "")  # Remove the http://
         temp = URL.find('/')
-        PATH = URL[temp:]  # split the extra html
-        URL = URL[:temp]        # only html
+        PATH = URL[temp:]                 # split the extra html
+        URL = URL[:temp]                  # only html
     
     if "proxy/" in PATH:
         path_split = PATH.split("/")
         if path_split[2] == "cache":
             client_socket.send(proxy_cache_order(path_split[3]))
         elif path_split[2] == "blocklist":
-<<<<<<< HEAD
-            client_socket.send(proxy_block_order(PATH))
-=======
             proxy_block_order(PATH)
->>>>>>> 0119c2a4175e2e35b08e68a55155f6d5ff374671
         client_socket.close()
         return
-
-    # if "proxy/cache" in PATH:
-        
-    #     client_socket.send(cache_request(PATH))
-    #     client_socket.close()
-    #     bin = True
-
-    #     # s_cache_request = PATH.split("/")
-    #     # cache_request = s_cache_request[3]
-    #     # if cache_request == "flush":
-    #     #     cacheList.clear()
-    #     # elif cache_request == "enable":
-    #     #     proxy_cache == True
-    #     # elif cache_request == "disable":
-    #     #     proxy_cache == False
-    #     # message = "200 OK"
-    #     # client_socket.send(message.encode())
-    #     # bin == True
-
-    # if "proxy/blocklist" in PATH:
-    #     cache_blocklist(client_socket, PATH)
-    #     bin = True
-    
     format['HOST'] = URL
     
     format['HTTP_VERSION'] = URL_Version + '\r\n'
-    if(bin == True):
-        return
-        # for block in blocklist:
-        #     if block in URL_Parse.netloc:
-        #         error = "403 Forbidden" + "\r\n"
-        #         sys.stderr.write(error)
-        #         client_socket.send(error.encode())
-        #         client_socket.close()
-        # try:
-        #     trim_hostname = URL_Parse.netloc.split('.')[0]
-        # finally:
-        #     if trim_hostname in blocklist:
-        #         error = "403 Forbidden"
-        #         sys.stderr.write(error)
-        #         client_socket.send(error.encode())
-        #         client_socket.close()
-    else:
-        print("==========Send to server process is on =========")
-        
-        # if URL_Parse.netloc in cacheList and cacheList[URL_Parse.netloc] == True:
-        #     sendServer = format['METHOD']+ " "  + PATH + " "  + format['HTTP_VERSION'] + "Host: " + format['HOST']+ "\r\n" + "Connection: close" + header + "If-modified-since: " + [time] + "\r\n" + "\r\n\r\n"
-        # else:
-        #     sendServer = format['METHOD']+ " "  + PATH + " "  + format['HTTP_VERSION'] + "Host: " + format['HOST']+ "\r\n" + "Connection: close" + header + "\r\n\r\n"
-        
-        # Check if cache is enable or disable
-        if proxy_cache == True:
-            # If it's cached.
-            if URL_Parse.netloc in cacheList:
-                tempDate = cacheList[URL_Parse.netloc].decode().split("\r\n")
-                modifier = tempDate[2].replace("Date: ", "")
-                sendServer = format['METHOD']+ " "  + PATH + " "  + format['HTTP_VERSION'] + "Host: " + format['HOST']+ "\r\n"+ "If-Modified-Since: "+ modifier+ "\r\n" + "Connection: close" + header + "\r\n\r\n"
-            else:
-                sendServer = format['METHOD']+ " "  + PATH + " "  + format['HTTP_VERSION'] + "Host: " + format['HOST']+ "\r\n" + "Connection: close" + header + "\r\n\r\n"
+    
+    print("==========Send to server process is on =========")
+    
+    #   If host is in cachelist, check if it's modified
+    #   else send normal request formatting
+    if proxy_cache == True:
+        if URL_Parse.netloc in cacheList:
+            tempDate = cacheList[URL_Parse.netloc].decode().split("\r\n")
+            modifier = tempDate[2].replace("Date: ", "")
+            sendServer = format['METHOD']+ " "  + PATH + " "  + format['HTTP_VERSION'] + "Host: " + format['HOST']+ "\r\n"+ "If-Modified-Since: "+ modifier+ "\r\n" + "Connection: close" + header + "\r\n\r\n"
         else:
             sendServer = format['METHOD']+ " "  + PATH + " "  + format['HTTP_VERSION'] + "Host: " + format['HOST']+ "\r\n" + "Connection: close" + header + "\r\n\r\n"
-            
-        print("==========After adding==========")
-        print(sendServer)
-        print("==============================")
-
-        #   create new socket for server
-        originServer = socket(AF_INET, SOCK_STREAM)
-
-        port_number = 80
-        #   connect with server, host name should be
-        if(URL_Parse.port):
-            port_number = URL_Parse.port
+    else:
+        sendServer = format['METHOD']+ " "  + PATH + " "  + format['HTTP_VERSION'] + "Host: " + format['HOST']+ "\r\n" + "Connection: close" + header + "\r\n\r\n"
         
-        originServer.connect((format['HOST'], port_number))
-        #   Send data to server
-        originServer.sendall(sendServer.encode())
-        value = b''
-        not_modified = False
-        while True:
-            temp = originServer.recv(2048)  #receive from originServer
-            #   if temp is not valid, break it
-            # print(temp)
-            if temp == b'':
-                break
-            #Send to client 
-            value += temp
-            # print("From the origin : ", repr(temp))
-            if proxy_cache == True:
-                if "304 Not Modified" in temp.decode():
-                    not_modified = True
-                    break
-        if proxy_cache == True:
-            print("proxy cache is true")
-            if not_modified == True:
-                print("not modified is true")
-                client_socket.send(cacheList[URL_Parse.netloc])
-            else:
-                print("not modified is false")
-                cacheList[URL_Parse.netloc] = value
-                client_socket.send(value)
-        else:
-            client_socket.send(value)    
-            
-        originServer.close()
-        client_socket.close()
+    print("==========Sending to server==========")
+    print(sendServer)
+    print("==============================")
+
+    #   create new socket for server
+    originServer = socket(AF_INET, SOCK_STREAM)
+
+    port_number = 80
+    #   connect with server, host name should be
+    if(URL_Parse.port):
+        port_number = URL_Parse.port
     
+    originServer.connect((format['HOST'], port_number))
+    #   Send data to server
+    originServer.sendall(sendServer.encode())
+    value = b''
+    not_modified = False
+    while True:
+        temp = originServer.recv(2048)  #receive from originServer
+        if temp == b'':                 #if temp is not valid, break it
+            break 
+        value += temp                   #keep adding recv from the orginServer
+        if proxy_cache == True:         #If cached is not changed, origin server send 304
+            if "304 Not Modified" in temp.decode():
+                not_modified = True
+                break
+    if proxy_cache == True:
+        if not_modified == True:                            #if it is not modified,send cache to client
+            client_socket.send(cacheList[URL_Parse.netloc])
+        else:
+            cacheList[URL_Parse.netloc] = value             #adding cache in proxy
+            client_socket.send(value)                       #send to client like normaly
+    else:
+        client_socket.send(value)
+        
+    originServer.close()
+    client_socket.close()
     
     for i in range(len(userList)):
         sleep(1)
@@ -355,4 +271,4 @@ while True:
     (connectionSocket, addr) = clientSocket.accept()
     userList.append(connectionSocket)
     
-    threading.Thread(target=handle_client, args=(connectionSocket, addr)).start()
+    threading.Thread(target=proxy_work, args=(connectionSocket, addr)).start()
