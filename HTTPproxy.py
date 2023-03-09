@@ -16,7 +16,7 @@ format = {'METHOD' : '', 'HOST': '','HTTP_VERSION': '', 'CONNECTION': '',}
 
 userList = []
 cacheList = {}
-blocklist = {}
+blocklist = []
 proxy_cache = False
 proxy_block = False
 
@@ -37,9 +37,9 @@ def proxy_block_order(path):
     order = path_split[3]
     if len(path_split) > 4:
         if order == "add":
-            blocklist[path_split[4]] = True
+            blocklist.append(path_split[4])
         elif order == "remove":
-            del blocklist[path_split[4]]
+            blocklist.remove(path_split[4])
     
     if order == "enable":
         proxy_block = True
@@ -144,7 +144,13 @@ def handle_client(client_socket, client_addr):
 
     URL_Parse = urlparse(split_readData[1])
     
-
+    if(proxy_block == True):
+        for block in blocklist:
+            if block in URL_Parse.netloc:
+                error = "403 Forbidden" + "\r\n"
+                sys.stderr.write(error)
+                client_socket.send(error.encode())
+                client_socket.close()
     
     if(not URL_Parse.scheme):
         print("URL scheme checking ", repr(URL_Parse.scheme))
@@ -209,11 +215,22 @@ def handle_client(client_socket, client_addr):
     format['HOST'] = URL
     
     format['HTTP_VERSION'] = URL_Version + '\r\n'
-    if(URL_Parse.netloc in blocklist and proxy_block == True):
-        error = "403 Forbidden"
-        sys.stderr.write(error)
-        client_socket.send(error.encode())
-        client_socket.close()
+    if(bin == True):
+        return
+        # for block in blocklist:
+        #     if block in URL_Parse.netloc:
+        #         error = "403 Forbidden" + "\r\n"
+        #         sys.stderr.write(error)
+        #         client_socket.send(error.encode())
+        #         client_socket.close()
+        # try:
+        #     trim_hostname = URL_Parse.netloc.split('.')[0]
+        # finally:
+        #     if trim_hostname in blocklist:
+        #         error = "403 Forbidden"
+        #         sys.stderr.write(error)
+        #         client_socket.send(error.encode())
+        #         client_socket.close()
     else:
         print("==========Send to server process is on =========")
         
